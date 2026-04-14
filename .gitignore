@@ -1,0 +1,135 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+config.json
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# SQLite database
+data/
+data.old/
+
+# Old build artifacts
+.next.old/
+
+# Logs
+logs/
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+tsconfig.tsbuildinfo
+*.egg-info/
+__pycache__/
+*.pyc
+
+# Python virtual environments (scripts)
+scripts/.venv/
+
+# To-be-deleted files
+.to-be-deleted/
+
+# Claude Code local state
+.claude/
+
+# Internal-only docs (kept local, not published)
+docs/prd.md
+docs/preview/
+
+# SQLite runtime companion files
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+
+# Backups
+*.bak
+*.backup
+*.orig
+
+# Coverage
+coverage/
+.nyc_output/
+start.log
+
+# Archive (kept locally, never publish)
+archive/
+
+# AI / project assistant context (kept local for Claude Code, never publish)
+CLAUDE.md
+AGENTS.md
+.cursorrules
+.cursor/
+
+# Databases (Forma Flow stores DB at %LOCALAPPDATA%, never inside the repo)
+*.db
+*.sqlite
+*.sqlite3
+
+# All log files anywhere
+*.log
+
+# Stronger env coverage (allow only .env.example through)
+.env*
+!.env.example
+
+# Next.js auto-generated type declarations
+next-env.d.ts
+
+# Build caches
+.turbo/
+.swc/
+.vercel/
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+
+# Certificates and keys (never commit these in any project)
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Credential file conventions
+secrets/
+credentials/
+credentials.json
+service-account*.json
+
+# npm / pnpm / yarn pack output and other manager logs
+*.tgz
+*.tar.gz
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor history / extras
+.history/
+*.swn
+
+# Windows extras
+Desktop.ini
+$RECYCLE.BIN/
