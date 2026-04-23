@@ -10,8 +10,6 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
-  // Capture origin early for background insights trigger
-  const origin = _request.nextUrl.origin;
 
   try {
     // Get task with project (exclude soft-deleted)
@@ -68,9 +66,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       logger.info({ taskId: task.id, commandId }, 'Model publish triggered successfully');
 
       // Auto-trigger insights extraction in background (non-blocking)
+      // Uses hardcoded localhost to avoid SSRF via Host header manipulation
       setTimeout(async () => {
         try {
-          await fetch(`${origin}/api/insights/${project.id}`, { method: 'POST' });
+          const port = process.env['PORT'] || 3000;
+          await fetch(`http://127.0.0.1:${port}/api/insights/${project.id}`, { method: 'POST' });
           logger.info({ projectId: project.id }, 'Background insights extraction triggered after publish');
         } catch (err) {
           logger.warn({ projectId: project.id, err }, 'Background insights extraction failed (non-critical)');
