@@ -52,9 +52,10 @@ scripts/.venv/
 # Claude Code local state
 .claude/
 
-# Internal-only docs (kept local, not published)
-docs/prd.md
-docs/preview/
+# Whitelist docs/ - ignore everything except images for README
+docs/*
+!docs/images/
+!docs/images/**
 
 # SQLite runtime companion files
 *.db-wal
