@@ -220,6 +220,15 @@ async function main() {
       .run('SUCCESS', new Date().toISOString(), JSON.stringify({ commandId }), jobResultId);
 
     console.log(`[${now}] Done - SUCCESS`);
+
+    // Auto-trigger insights extraction (best-effort, web UI might not be running)
+    try {
+      const port = config.port || 3000;
+      await fetch(`http://127.0.0.1:${port}/api/insights/${task.project_id}`, { method: 'POST' });
+      console.log(`[${new Date().toISOString()}] Insights extraction triggered`);
+    } catch {
+      // Web UI not running, that's OK for scheduled tasks
+    }
   } catch (err) {
     const msg = redact(err.message || String(err));
     console.error(`[${new Date().toISOString()}] FAILED: ${msg}`);

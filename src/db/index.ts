@@ -62,6 +62,27 @@ const statements = [
     result_data TEXT,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS model_insights (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    version_number INTEGER,
+    file_size INTEGER,
+    view_count INTEGER,
+    sheet_count INTEGER,
+    schedule_count INTEGER,
+    revit_link_count INTEGER,
+    cad_link_count INTEGER,
+    family_count INTEGER,
+    in_place_count INTEGER,
+    room_count INTEGER,
+    level_count INTEGER,
+    total_elements INTEGER,
+    health_score INTEGER,
+    details TEXT,
+    fetched_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
 ];
 
 const indexes = [
@@ -69,8 +90,21 @@ const indexes = [
   `CREATE INDEX IF NOT EXISTS idx_job_results_status ON job_results(status)`,
   `CREATE INDEX IF NOT EXISTS idx_job_results_created_at ON job_results(created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_model_insights_project_id ON model_insights(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_model_insights_fetched_at ON model_insights(fetched_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_model_insights_project_fetched ON model_insights(project_id, fetched_at DESC)`,
+];
+
+// Migrations: add columns to existing tables
+const migrations = [
+  `ALTER TABLE model_insights ADD COLUMN total_elements INTEGER`,
 ];
 
 for (const sql of [...statements, ...indexes]) {
   sqlite.prepare(sql).run();
+}
+
+// Run migrations (ignore errors if column already exists)
+for (const sql of migrations) {
+  try { sqlite.prepare(sql).run(); } catch { /* column already exists */ }
 }

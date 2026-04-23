@@ -11,10 +11,21 @@ Forma Flow is a self-hosted Windows application that:
 - **Schedules model publishes** to ACC using Windows Task Scheduler
 - **Manages credentials securely** with encrypted storage (AES-256-GCM)
 - **Provides a web dashboard** for setup, monitoring, and job history
+- **Analyzes published models** with health scoring, family breakdowns, workset distribution, and linked file detection
 - **Runs automatically**: the web UI doesn't need to stay open for scheduled tasks to fire
 - **Tracks job history** with detailed logs and execution status
 
 Built with Next.js 16, React 19, TypeScript, Tailwind CSS, and the Autodesk Platform Services API.
+
+### Model Insights Dashboard
+
+Automatically extracts metadata from published models on ACC. See health scores, element breakdowns, workset distribution, linked files, and family analysis at a glance.
+
+<p align="center"><img src="docs/images/Dashboard.png" alt="Model Insights Dashboard"></p>
+
+Drill into categories, family types, worksets, and linked files with interactive charts. Health report card shows actionable recommendations for each scoring category.
+
+<p align="center"><img src="docs/images/Dashboard2.png" alt="Dashboard Details - Charts and Family Breakdown"></p>
 
 ## Getting Started
 

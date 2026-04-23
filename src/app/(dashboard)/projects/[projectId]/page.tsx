@@ -7,8 +7,15 @@ import { TaskForm } from '@/components/task-form';
 import { JobHistoryTable } from '@/components/job-history-table';
 import { useToast } from '@/components/toast';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { TaskCardSkeleton, CardSkeleton, Skeleton } from '@/components/skeleton';
 import { useTaskActions } from '@/hooks/use-task-actions';
+import { ModelInsightsCard } from '@/components/model-insights-card';
+import { ModelInsightsDelta } from '@/components/model-insights-delta';
+import { TopNCard } from '@/components/top-n-card';
+import { HealthBreakdown as HealthBreakdownComponent } from '@/components/health-breakdown';
+import { ModelNarrative } from '@/components/model-narrative';
+import { computeHealthBreakdown } from '@/lib/health-score';
 
 type Project = {
   id: string;
@@ -57,6 +64,12 @@ export default function ProjectDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [missingSchedulers, setMissingSchedulers] = useState<Set<string>>(new Set());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [insights, setInsights] = useState<any>(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
+  const [showInsightsDetail, setShowInsightsDetail] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [insightsPrevious, setInsightsPrevious] = useState<any>(null);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -82,6 +95,18 @@ export default function ProjectDetailPage({
           } else console.error('Failed to fetch jobs:', jobsRes.statusText);
 
           setLoading(false);
+
+          // Fetch model insights (non-blocking)
+          fetch(`/api/insights/${projectId}`, { signal: abortController.signal })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+              if (data && !data.error) {
+                setInsights(data);
+                setInsightsPrevious(data.previous || null);
+              }
+            })
+            .catch(() => {})
+            .finally(() => setInsightsLoading(false));
 
           // 2-way sync: check which scheduled tasks exist in Windows Task Scheduler
           fetch(`/api/tasks/sync?projectId=${projectId}`, { signal: abortController.signal })
@@ -261,6 +286,213 @@ export default function ProjectDetailPage({
           {project.projectName}
         </h1>
 
+      </div>
+
+      {/* Model Insights */}
+      <div className="p-6 border-b-subtle">
+        <ModelInsightsCard
+          insights={insights}
+          loading={insightsLoading}
+          projectId={projectId}
+          onViewDetails={() => setShowInsightsDetail(!showInsightsDetail)}
+          onRefresh={() => {
+            setInsightsLoading(true);
+            fetch(`/api/insights/${projectId}`)
+              .then(r => r.ok ? r.json() : null)
+              .then(data => { if (data && !data.error) setInsights(data); })
+              .catch(() => {})
+              .finally(() => setInsightsLoading(false));
+          }}
+        />
+
+        {/* Narrative summary */}
+        {insights && (
+          <div className="mt-3">
+            <ModelNarrative insights={insights} previous={insightsPrevious} />
+          </div>
+        )}
+
+        {/* Delta card: what changed since last analysis */}
+        {insights && insightsPrevious && (
+          <div className="mt-2">
+            <ModelInsightsDelta current={insights} previous={insightsPrevious} />
+          </div>
+        )}
+
+        {/* Expanded detail panel */}
+        {showInsightsDetail && insights?.details && (
+          <div className="mt-4 border-all-subtle bg-slate-50/50 p-5 space-y-5">
+            {/* Health Report Card */}
+            <HealthBreakdownComponent breakdown={computeHealthBreakdown(insights)} />
+
+            {/* Empty state: only show when ALL detail data is empty */}
+            {(!insights.details.families || Object.keys(insights.details.families).length === 0) &&
+             (!insights.details.userWorksets || Object.keys(insights.details.userWorksets as Record<string, unknown>).length === 0) &&
+             (!insights.details.levels || (insights.details.levels as string[]).length === 0) &&
+             (!insights.details.revitLinks || (insights.details.revitLinks as string[]).length === 0) && (
+              <div className="text-center py-4">
+                <p className="text-sm text-slate-500">No detail data in this snapshot.</p>
+                <p className="text-xs text-slate-400 mt-1">Click "Re-analyze" to pull fresh data.</p>
+              </div>
+            )}
+
+            {/* Row 1: Top-N Grid (2x2) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card 1: Top 5 Categories */}
+              {insights.details.families && Object.keys(insights.details.families).length > 0 && (
+                <TopNCard
+                  title="Top Categories"
+                  data={Object.entries(insights.details.families as Record<string, Record<string, number>>)
+                    .map(([cat, types]) => ({
+                      name: cat,
+                      value: Object.values(types).reduce((s, n) => s + (n as number), 0),
+                    }))
+                    .sort((a, b) => b.value - a.value)}
+                  maxItems={5}
+                />
+              )}
+
+              {/* Card 2: Top 10 Family Types (across ALL categories) */}
+              {insights.details.families && Object.keys(insights.details.families).length > 0 && (
+                <TopNCard
+                  title="Top Family Types"
+                  data={(() => {
+                    const allFamilyTypes: Array<{ name: string; value: number }> = [];
+                    for (const [cat, types] of Object.entries(insights.details.families as Record<string, Record<string, number>>)) {
+                      for (const [name, count] of Object.entries(types)) {
+                        allFamilyTypes.push({ name, value: count as number });
+                      }
+                    }
+                    return allFamilyTypes.sort((a, b) => b.value - a.value);
+                  })()}
+                  maxItems={10}
+                  barColor="#10b981"
+                />
+              )}
+
+              {/* Card 3: Top 5 Worksets */}
+              {insights.details.userWorksets && Object.keys(insights.details.userWorksets).length > 0 && (
+                <TopNCard
+                  title="Top Worksets"
+                  data={Object.entries(insights.details.userWorksets as Record<string, number>)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value)}
+                  maxItems={5}
+                  barColor="#f59e0b"
+                />
+              )}
+
+              {/* Card 4: Links (only if any links exist) */}
+              {(() => {
+                const linkData = [
+                  ...(insights.details.revitLinks || []).map((l: string) => ({ name: l, type: 'RVT' as const })),
+                  ...(insights.details.cadLinks || []).map((l: string) => ({ name: l, type: 'CAD' as const })),
+                ];
+                if (linkData.length > 0) {
+                  return (
+                    <div className="border-all-subtle bg-white p-4 shadow-sm">
+                      <h5 className="text-sm font-semibold text-slate-700 mb-3">Linked Files ({linkData.length})</h5>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {(insights.details.revitLinks || []).map((l: string, i: number) => (
+                          <div key={`rvt-${i}`} className="flex items-center gap-2 py-1">
+                            <Badge variant="info">RVT</Badge>
+                            <span className="text-xs font-mono text-slate-700 truncate">{l}</span>
+                          </div>
+                        ))}
+                        {(insights.details.cadLinks || []).map((l: string, i: number) => (
+                          <div key={`cad-${i}`} className="flex items-center gap-2 py-1">
+                            <Badge variant="neutral">CAD</Badge>
+                            <span className="text-xs font-mono text-slate-700 truncate">{l}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+            {/* Row 2: Levels + In-Place warnings */}
+            {insights.details.levels?.length > 0 && (
+              <div>
+                <h5 className="text-sm font-semibold text-slate-700 mb-2">Levels ({[...new Set(insights.details.levels as string[])].length})</h5>
+                <div className="flex flex-wrap gap-1.5">
+                  {[...new Set(insights.details.levels as string[])].map((l: string, i: number) => (
+                    <span key={i} className="text-xs font-mono bg-white border border-slate-200 px-2 py-1">{l}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* In-place components warning */}
+            {insights.details.inPlaceComponents?.length > 0 && (
+              <div className="p-3 bg-amber-50 border border-amber-200">
+                <h5 className="text-sm font-semibold text-amber-900 mb-1">In-Place Components ({insights.inPlaceCount})</h5>
+                <p className="text-xs text-amber-800 mb-2">In-place components reduce model performance. Consider converting to loadable families.</p>
+                {(insights.details.inPlaceComponents as string[]).map((c: string, i: number) => (
+                  <p key={i} className="text-xs font-mono text-amber-700">{c}</p>
+                ))}
+              </div>
+            )}
+
+            {/* Row 3: Drill-down families accordion */}
+            {insights.details.families && Object.keys(insights.details.families).length > 0 && (
+              <div>
+                <h5 className="text-sm font-semibold text-slate-700 mb-3">Families by Category ({insights.familyCount})</h5>
+                <div className="space-y-2">
+                  {Object.entries(insights.details.families as Record<string, Record<string, number>>)
+                    .sort(([, a], [, b]) => {
+                      const totalA = Object.values(a).reduce((s, n) => s + (n as number), 0);
+                      const totalB = Object.values(b).reduce((s, n) => s + (n as number), 0);
+                      return totalB - totalA;
+                    })
+                    .map(([category, familyCounts]) => {
+                      const totalInCategory = Object.values(familyCounts).reduce((s, n) => s + (n as number), 0);
+                      const sorted = Object.entries(familyCounts).sort(([, a], [, b]) => (b as number) - (a as number));
+                      const typeCount = sorted.length;
+                      return (
+                        <details key={category} className="bg-white border border-slate-200">
+                          <summary className="px-3 py-2 text-sm text-slate-700 cursor-pointer hover:bg-slate-50">
+                            <span className="font-medium">{category}</span>
+                            <span className="text-slate-500 ml-2">({typeCount} types, {totalInCategory.toLocaleString()} elements)</span>
+                          </summary>
+                          <div className="border-t border-slate-100">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-slate-200 bg-slate-50/50">
+                                  <th className="text-left px-3 py-1.5 text-slate-500 font-medium">Family / Type</th>
+                                  <th className="text-right px-3 py-1.5 text-slate-500 font-medium">Count</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sorted.slice(0, 10).map(([famName, count]) => (
+                                  <tr key={famName} className="border-b border-slate-50">
+                                    <td className="px-3 py-1 font-mono text-slate-700">{famName}</td>
+                                    <td className="px-3 py-1 font-mono text-slate-600 text-right">
+                                      {(count as number).toLocaleString()}
+                                      {(count as number) === 1 && <span className="text-amber-500 ml-1.5 text-[10px] font-sans">single</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                                {typeCount > 10 && (
+                                  <tr>
+                                    <td colSpan={2} className="px-3 py-1.5 text-xs text-slate-500 italic">
+                                      + {typeCount - 10} more types (open in Revit for full list)
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Two-column layout */}

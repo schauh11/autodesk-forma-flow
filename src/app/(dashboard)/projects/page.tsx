@@ -8,6 +8,7 @@ import { HubProjectPicker } from '@/components/hub-project-picker';
 import { useToast } from '@/components/toast';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { DashboardStats } from '@/components/dashboard-stats';
 
 type Project = {
   id: string;
@@ -23,6 +24,7 @@ export default function ProjectsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addingProject, setAddingProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentJobs, setRecentJobs] = useState<{ status: string; createdAt: string }[]>([]);
   const { showToast } = useToast();
   const addProjectDialogRef = useRef<HTMLDivElement>(null);
 
@@ -42,8 +44,9 @@ export default function ProjectsPage() {
     Promise.all([
       fetch('/api/projects').then((r) => { if (!r.ok) throw new Error(`Projects: ${r.status}`); return r.json(); }),
       fetch('/api/tasks').then((r) => { if (!r.ok) throw new Error(`Tasks: ${r.status}`); return r.json(); }),
+      fetch('/api/jobs?limit=20').then((r) => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] })),
     ])
-      .then(([projectsData, tasksData]) => {
+      .then(([projectsData, tasksData, jobsData]) => {
         setProjects(Array.isArray(projectsData) ? projectsData : []);
         const counts: Record<string, number> = {};
         const taskList = Array.isArray(tasksData) ? tasksData : [];
@@ -51,6 +54,11 @@ export default function ProjectsPage() {
           counts[task.projectId] = (counts[task.projectId] || 0) + 1;
         }
         setTaskCounts(counts);
+        const jobs = (jobsData?.data || []).map((j: { job: { status: string; createdAt: string } }) => ({
+          status: j.job.status,
+          createdAt: j.job.createdAt,
+        }));
+        setRecentJobs(jobs);
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to load projects');
@@ -105,6 +113,19 @@ export default function ProjectsPage() {
     <div>
       <div className="border-b-subtle p-6 bg-white">
         <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
+      </div>
+
+      {/* Dashboard Stats */}
+      <div className="p-6 border-b-subtle">
+        <DashboardStats
+          projects={projects.length}
+          activeTasks={Object.values(taskCounts).reduce((a, b) => a + b, 0)}
+          successRate={recentJobs.length > 0
+            ? Math.round(recentJobs.filter(j => j.status === 'SUCCESS').length / recentJobs.length * 100)
+            : 0}
+          lastPublish={recentJobs.length > 0 ? recentJobs[0]?.createdAt ?? null : null}
+          recentJobs={recentJobs}
+        />
       </div>
 
       <div className="p-8">

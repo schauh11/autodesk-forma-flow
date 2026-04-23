@@ -39,9 +39,32 @@ export const jobResults = sqliteTable('job_results', {
   createdAt: text('created_at').notNull().$defaultFn(now),
 });
 
+export const modelInsights = sqliteTable('model_insights', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  itemId: text('item_id').notNull(),
+  versionNumber: integer('version_number'),
+  fileSize: integer('file_size'),
+  viewCount: integer('view_count'),
+  sheetCount: integer('sheet_count'),
+  scheduleCount: integer('schedule_count'),
+  revitLinkCount: integer('revit_link_count'),
+  cadLinkCount: integer('cad_link_count'),
+  familyCount: integer('family_count'),
+  inPlaceCount: integer('in_place_count'),
+  roomCount: integer('room_count'),
+  levelCount: integer('level_count'),
+  totalElements: integer('total_elements'),
+  healthScore: integer('health_score'),
+  details: text('details', { mode: 'json' }),
+  fetchedAt: text('fetched_at').notNull().$defaultFn(now),
+  createdAt: text('created_at').notNull().$defaultFn(now),
+});
+
 // Relations
 export const projectsRelations = relations(projects, ({ many }) => ({
   tasks: many(tasks),
+  modelInsights: many(modelInsights),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
@@ -51,4 +74,8 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
 
 export const jobResultsRelations = relations(jobResults, ({ one }) => ({
   task: one(tasks, { fields: [jobResults.taskId], references: [tasks.id] }),
+}));
+
+export const modelInsightsRelations = relations(modelInsights, ({ one }) => ({
+  project: one(projects, { fields: [modelInsights.projectId], references: [projects.id] }),
 }));
