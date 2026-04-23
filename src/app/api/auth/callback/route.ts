@@ -35,7 +35,8 @@ export async function GET(request: NextRequest) {
     }
 
     const redirectUri = `${origin}/api/auth/callback`;
-    const tokens = await exchangeCodeForTokens(code, config.aps_client_id, config.aps_client_secret, redirectUri);
+    const codeVerifier = request.cookies.get('pkce_verifier')?.value;
+    const tokens = await exchangeCodeForTokens(code, config.aps_client_id, config.aps_client_secret, redirectUri, codeVerifier);
 
     if (!tokens.refresh_token) {
       throw new Error('No refresh token received from Autodesk');
@@ -73,14 +74,16 @@ export async function GET(request: NextRequest) {
     const response = htmlResponse(200, `<html><body><p>Connected! This window will close.</p>
       <script>if(window.opener){window.opener.postMessage({type:'auth-complete'},window.location.origin);}window.close();</script></body></html>`);
 
-    // Clear state cookie
+    // Clear state and PKCE cookies
     response.cookies.set('oauth_state', '', { httpOnly: true, sameSite: 'lax', maxAge: 0, path: '/api/auth/callback' });
+    response.cookies.set('pkce_verifier', '', { httpOnly: true, sameSite: 'lax', maxAge: 0, path: '/api/auth/callback' });
     return response;
   } catch (error) {
     logger.error({ err: error }, 'GET /api/auth/callback error');
     const response = htmlResponse(500, `<html><body><p>Authorization failed.</p>
       <script>if(window.opener){window.opener.postMessage({type:'auth-error',error:'Authorization failed'},window.location.origin);}setTimeout(()=>window.close(),3000);</script></body></html>`);
     response.cookies.set('oauth_state', '', { httpOnly: true, sameSite: 'lax', maxAge: 0, path: '/api/auth/callback' });
+    response.cookies.set('pkce_verifier', '', { httpOnly: true, sameSite: 'lax', maxAge: 0, path: '/api/auth/callback' });
     return response;
   }
 }

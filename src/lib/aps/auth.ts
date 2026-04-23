@@ -15,7 +15,8 @@ export function buildAuthorizationUrl(
   clientId: string,
   redirectUri: string,
   scopes: string[] = ['data:read', 'data:write', 'data:create', 'code:all'],
-  state?: string
+  state?: string,
+  codeChallenge?: string
 ): string {
   // Use encodeURIComponent for proper %20 encoding (not + from URLSearchParams)
   const params = [
@@ -24,6 +25,7 @@ export function buildAuthorizationUrl(
     `redirect_uri=${encodeURIComponent(redirectUri)}`,
     `scope=${encodeURIComponent(scopes.join(' '))}`,
     ...(state ? [`state=${encodeURIComponent(state)}`] : []),
+    ...(codeChallenge ? [`code_challenge=${encodeURIComponent(codeChallenge)}`, `code_challenge_method=S256`] : []),
   ].join('&');
   return `${APS_BASE_URL}/authentication/v2/authorize?${params}`;
 }
@@ -32,20 +34,27 @@ export async function exchangeCodeForTokens(
   code: string,
   clientId: string,
   clientSecret: string,
-  redirectUri: string
+  redirectUri: string,
+  codeVerifier?: string
 ): Promise<TokenResponse> {
+  const params: Record<string, string> = {
+    grant_type: 'authorization_code',
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+  };
+
+  if (codeVerifier) {
+    params['code_verifier'] = codeVerifier;
+  }
+
   const response = await fetch(`${APS_BASE_URL}/authentication/v2/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-    }),
+    body: new URLSearchParams(params),
   });
 
   if (!response.ok) {
